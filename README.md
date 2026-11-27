@@ -51,3 +51,5 @@ Enquanto `implemented` for `false`, a API retorna HTTP 501 para aquele módulo.
 Este repositório é entregue intencionalmente sem testes automatizados, análise estática, workflow de CI, build ou configuração de deploy. O estudante deverá criar e justificar esses elementos durante a avaliação.
 
 O servidor escuta `process.env.PORT` e `0.0.0.0`, e a aplicação não persiste dados em disco.
+
+exemplo
