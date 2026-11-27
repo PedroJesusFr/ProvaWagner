@@ -1,0 +1,13 @@
+# Arquivos-base do template LAB40 fornecidos pelo professor.
+# Não são reformatados para não alterar a API central/interface sem autorização
+# (ver README: "Não altere o contrato dos outros módulos nem a API central").
+src/app.js
+src/server.js
+src/features/index.js
+public/
+README.md
+
+# Gerados/externos
+node_modules/
+package-lock.json
+coverage/
