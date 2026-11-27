@@ -1,0 +1,86 @@
+# CD simulado: após push/merge na main, constrói a imagem Docker, valida o container
+# e publica a imagem (.tar) e o deployment-record.txt como artefato.
+# Substitua por o YAML de CD fornecido pelo professor, se houver.
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: lab40
+  IMAGE_TAG: feature05
+  CONTAINER_NAME: lab40-cd
+
+jobs:
+  deliver:
+    name: Entrega simulada
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Construir imagem Docker
+        run: |
+          docker build --pull \
+            --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+            --label "org.opencontainers.image.revision=${{ github.sha }}" \
+            -t "$IMAGE_NAME:$IMAGE_TAG" \
+            -t "$IMAGE_NAME:${{ github.sha }}" .
+
+      - name: Validar container antes da entrega
+        run: |
+          docker run -d --name "$CONTAINER_NAME" -p 3000:3000 "$IMAGE_NAME:$IMAGE_TAG"
+          for i in $(seq 1 30); do
+            curl --fail --silent http://localhost:3000/health && break
+            sleep 1
+          done
+          echo
+          curl --fail --silent --show-error http://localhost:3000/health
+          echo
+          curl --fail --silent --show-error -X POST http://localhost:3000/api/features/5 \
+            -H "Content-Type: application/json" \
+            -d '{"valor":2.5,"origem":"km","destino":"m"}' | tee resposta.json
+          echo
+          grep -q '"resultado":2500' resposta.json
+
+      - name: Encerrar container
+        if: always()
+        run: docker rm -f "$CONTAINER_NAME" || true
+
+      - name: Exportar imagem e gerar registro de entrega
+        run: |
+          mkdir -p delivery
+          docker save "$IMAGE_NAME:$IMAGE_TAG" -o "delivery/lab40-$IMAGE_TAG.tar"
+          IMAGE_ID=$(docker image inspect "$IMAGE_NAME:$IMAGE_TAG" --format '{{.Id}}')
+          {
+            echo "LAB40 - Registro de entrega (CD simulado)"
+            echo "Repositorio: ${{ github.server_url }}/${{ github.repository }}"
+            echo "Referencia: ${{ github.ref }}"
+            echo "Branch: ${{ github.ref_name }}"
+            echo "Commit SHA: ${{ github.sha }}"
+            echo "Imagem: $IMAGE_NAME:$IMAGE_TAG"
+            echo "Tag adicional: $IMAGE_NAME:${{ github.sha }}"
+            echo "Image ID: $IMAGE_ID"
+            echo "Arquivo: lab40-$IMAGE_TAG.tar"
+            echo "SHA-256 do .tar: $(sha256sum "delivery/lab40-$IMAGE_TAG.tar" | cut -d' ' -f1)"
+            echo "Workflow: ${{ github.workflow }} #${{ github.run_number }}"
+            echo "Execucao: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "Disparado por: ${{ github.actor }} (${{ github.event_name }})"
+            echo "Data (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > delivery/deployment-record.txt
+          cat delivery/deployment-record.txt
+          ls -lh delivery
+
+      - name: Publicar artefato de entrega
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab40-delivery-record
+          path: delivery/
+          retention-days: 30
