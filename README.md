@@ -52,6 +52,7 @@ Este repositório é entregue intencionalmente sem testes automatizados, anális
 
 O servidor escuta `process.env.PORT` e `0.0.0.0`, e a aplicação não persiste dados em disco.
 
+<<<<<<< HEAD
 ---
 
 ## Entrega do estudante – Feature 05 (Conversor de medidas)
@@ -96,3 +97,6 @@ docker stop lab40-container && docker rm lab40-container
 Executa em push para `main`/`feature/**` e em Pull Request para `main`: checkout → Node 22 → `npm ci` → formatação → lint → testes → smoke test → auditoria → build da imagem → container efêmero validando `/health` e a feature 05 → exportação da imagem (`.tar`) como artefato `lab40-docker-image`.
 
 Requisito: Node.js 20.19+ (exigido pelo ESLint 10).
+=======
+exemplo
+>>>>>>> c1a4691e036730a8dd77607da044fb740b8f5c40
