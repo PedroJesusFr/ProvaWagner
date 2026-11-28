@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: lab40:feature05
+  CONTAINER_NAME: lab40-ci
+  HOST_PORT: "3000"
+
+jobs:
+  build-test:
+    name: Qualidade, testes e imagem Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências (npm ci)
+        run: npm ci
+
+      - name: Verificar formatação (Prettier)
+        run: npm run format:check
+
+      - name: Análise estática (ESLint)
+        run: npm run lint
+
+      - name: Testes automatizados (node:test)
+        run: npm run test:spec
+
+      - name: Smoke test (servidor local)
+        run: npm run test:smoke
+
+      - name: Auditoria de dependências
+        run: npm audit --audit-level=high
+
+      - name: Construir imagem Docker
+        run: |
+          docker build --pull -t "$IMAGE_NAME" .
+          docker images "$IMAGE_NAME"
+
+      - name: Executar container efêmero
+        run: |
+          docker run -d --name "$CONTAINER_NAME" -p "$HOST_PORT:3000" "$IMAGE_NAME"
+          docker ps --filter "name=$CONTAINER_NAME"
+
+      - name: Validar /health e endpoint da feature 05 no container
+        run: |
+          for i in $(seq 1 30); do
+            curl --fail --silent "http://localhost:$HOST_PORT/health" && break
+            sleep 1
+          done
+          echo
+          curl --fail --silent --show-error "http://localhost:$HOST_PORT/health"
+          echo
+          RESPOSTA=$(curl --fail --silent --show-error -X POST \
+            "http://localhost:$HOST_PORT/api/features/5" \
+            -H "Content-Type: application/json" \
+            -d '{"valor":2.5,"origem":"km","destino":"m"}')
+          echo "$RESPOSTA"
+          echo "$RESPOSTA" | grep -q '"resultado":2500'
+          SMOKE_URL="http://localhost:$HOST_PORT" npm run test:smoke
+
+      - name: Logs do container (em caso de falha)
+        if: failure()
+        run: docker logs "$CONTAINER_NAME" || true
+
+      - name: Encerrar container
+        if: always()
+        run: docker rm -f "$CONTAINER_NAME" || true
+
+      - name: Exportar imagem (.tar)
+        run: docker save "$IMAGE_NAME" -o lab40-feature05.tar
+
+      - name: Publicar imagem como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab40-docker-image
+          path: lab40-feature05.tar
+          retention-days: 7
